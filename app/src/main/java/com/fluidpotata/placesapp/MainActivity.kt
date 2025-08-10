@@ -24,12 +24,78 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PlacesAppTheme {
-                Greeting("Android")
+                MyApp()
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MyApp() {
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val navController = rememberNavController()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            DrawerContent { route ->
+                scope.launch {
+                    navController.navigate(route) {
+                        popUpTo(ScreenRoutes.Map) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                    drawerState.close()
+                }
+            }
+        }
+    ) {
+        Scaffold(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            topBar = {
+                TopAppBar(
+                    title = { Text("Map Mania") },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu")
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = ScreenRoutes.Map,
+                modifier = Modifier.padding(innerPadding)
+            ) {
+                composable(ScreenRoutes.Map) { Greeting("Map") }
+                composable(ScreenRoutes.Form) { Greeting("Form") }
+                composable(ScreenRoutes.List) { Greeting("List") }
+            }
+        }
+    }
+}
+
+@Composable
+fun DrawerContent(onItemClicked: (String) -> Unit) {
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text("Navigation", style = MaterialTheme.typography.titleLarge)
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        DrawerItem("Home", onClick = { onItemClicked(ScreenRoutes.Map) })
+        DrawerItem("Form", onClick = { onItemClicked(ScreenRoutes.Form) })
+        DrawerItem("List", onClick = { onItemClicked(ScreenRoutes.List) })
+    }
+}
+
+@Composable
+fun DrawerItem(label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Text(text = label)
+    }
+}
 
 @Composable
 fun Greeting(name: String) {
