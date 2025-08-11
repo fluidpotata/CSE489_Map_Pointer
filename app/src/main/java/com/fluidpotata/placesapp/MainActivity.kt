@@ -12,9 +12,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.fluidpotata.placesapp.ui.theme.PlacesAppTheme
 import kotlinx.coroutines.launch
 
@@ -71,9 +73,22 @@ fun MyApp() {
                 startDestination = ScreenRoutes.Map,
                 modifier = Modifier.padding(innerPadding)
             ) {
-                composable(ScreenRoutes.Map) { Greeting("Map") }
-                composable(ScreenRoutes.Form) { Greeting("Form") }
-                composable(ScreenRoutes.List) { Greeting("List") }
+                composable(ScreenRoutes.Map) {
+                    MapScreen(navController)
+                }
+                composable(ScreenRoutes.Form) {
+                    FormScreen(navController, null)
+                }
+                composable(
+                    "edit/{placeId}",
+                    arguments = listOf(navArgument("placeId") { type = NavType.IntType })
+                ) { backStackEntry ->
+                    val placeId = backStackEntry.arguments?.getInt("placeId")
+                    FormScreen(navController, placeId)
+                }
+                composable(ScreenRoutes.List) {
+                    ListScreen(navController)
+                }
             }
         }
     }
@@ -95,9 +110,4 @@ fun DrawerItem(label: String, onClick: () -> Unit) {
     TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Text(text = label)
     }
-}
-
-@Composable
-fun Greeting(name: String) {
-    Text(text = "Hello $name!")
 }
