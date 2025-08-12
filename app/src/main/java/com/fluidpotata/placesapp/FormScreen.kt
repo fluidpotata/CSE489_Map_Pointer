@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 fun FormScreen(navController: NavController, placeId: Int? = null) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val db = remember { AppDatabase.getDatabase(context) }
 
     var title by remember { mutableStateOf("") }
     var lat by remember { mutableStateOf("") }
@@ -40,6 +41,7 @@ fun FormScreen(navController: NavController, placeId: Int? = null) {
         }
     }
 
+    // Load place data for editing
     LaunchedEffect(placeId) {
         placeId?.let {
             try {
@@ -132,29 +134,38 @@ fun FormScreen(navController: NavController, placeId: Int? = null) {
 
                 coroutineScope.launch {
                     try {
-                        val response = if (placeId == null) {
-                            // Create with image (if any)
-                            ApiClient.api.createPlace(
+                        if (placeId == null) {
+                            val response = ApiClient.api.createPlace(
                                 title.toPlainRequestBody(),
                                 latDouble.toString().toPlainRequestBody(),
                                 lonDouble.toString().toPlainRequestBody(),
-                                selectedImage?.let { bitmapToMultipart(context, it, "image", "upload.jpg") }
+                                selectedImage?.let { bitmapToMultipart(context, it, "image", "$title.jpg") }
                             )
+                            if (response.isSuccessful) {
+                                val newId = response.body()?.id
+                                if (newId != null) {
+                                    db.placeOwnerDao().insertPlace(PlaceOwner(newId))
+                                }
+                                navController.navigate(ScreenRoutes.List) {
+                                    popUpTo(ScreenRoutes.List) { inclusive = true }
+                                }
+                            } else {
+                                errorMsg = "Failed to save place: ${response.code()} ${response.message()}"
+                            }
                         } else {
-                            // Update without image (PUT x-www-form-urlencoded)
-                            ApiClient.api.updatePlace(
+                            val response = ApiClient.api.updatePlace(
                                 placeId,
                                 title,
                                 latDouble,
                                 lonDouble
                             )
-                        }
-                        if (response.isSuccessful) {
-                            navController.navigate(ScreenRoutes.List) {
-                                popUpTo(ScreenRoutes.List) { inclusive = true }
+                            if (response.isSuccessful) {
+                                navController.navigate(ScreenRoutes.List) {
+                                    popUpTo(ScreenRoutes.List) { inclusive = true }
+                                }
+                            } else {
+                                errorMsg = "Failed to update place: ${response.code()} ${response.message()}"
                             }
-                        } else {
-                            errorMsg = "Failed to save place: ${response.code()} ${response.message()}"
                         }
                     } catch (e: Exception) {
                         errorMsg = "Error saving place: ${e.localizedMessage}"
