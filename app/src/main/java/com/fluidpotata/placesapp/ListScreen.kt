@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import kotlinx.coroutines.launch
@@ -18,7 +19,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun ListScreen(navController: NavController) {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val db = remember { AppDatabase.getDatabase(context) }
+
     var places by remember { mutableStateOf<List<Place>>(emptyList()) }
+    var ownedIds by remember { mutableStateOf<List<Int>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
@@ -27,6 +32,7 @@ fun ListScreen(navController: NavController) {
             try {
                 isLoading = true
                 places = ApiClient.api.getPlaces()
+                ownedIds = db.placeOwnerDao().getAllOwnedIds()
                 errorMsg = null
             } catch (e: Exception) {
                 Log.e("ListScreen", "Error fetching places", e)
@@ -90,10 +96,13 @@ fun ListScreen(navController: NavController) {
                                 Text("Lat: ${place.lat}, Lon: ${place.lon}")
                             }
                             Spacer(Modifier.width(8.dp))
-                            TextButton(onClick = {
-                                navController.navigate("edit/${place.id}")
-                            }) {
-                                Text("Edit")
+
+                            if (ownedIds.contains(place.id)) {
+                                TextButton(onClick = {
+                                    navController.navigate("edit/${place.id}")
+                                }) {
+                                    Text("Edit")
+                                }
                             }
                         }
                     }
