@@ -51,6 +51,17 @@ interface PlacesApi {
         @Field("lat") lat: Double,
         @Field("lon") lon: Double
     ): Response<Unit>
+
+    @Multipart
+    @PUT("api.php")
+    suspend fun updatePlaceWithImage(
+        @Part("id") id: Int,
+        @Part("title") title: String,
+        @Part("lat") lat: Double,
+        @Part("lon") lon: Double,
+        @Part image: MultipartBody.Part
+    ): Response<Unit>
+
 }
 
 object ApiClient {
