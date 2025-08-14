@@ -17,10 +17,18 @@ import java.io.FileOutputStream
 data class Place(
     val id: Int,
     val title: String,
-    val lat: Double,
-    val lon: Double,
+    val lat: String?,
+    val lon: String?,
     val image: String?
+) {
+    fun latAsDouble(): Double? = lat?.toDoubleOrNull()
+    fun lonAsDouble(): Double? = lon?.toDoubleOrNull()
+}
+
+data class PlaceResponse(
+    val id: Int,
 )
+
 
 interface PlacesApi {
     @GET("api.php")
@@ -33,11 +41,11 @@ interface PlacesApi {
         @Part("lat") lat: RequestBody,
         @Part("lon") lon: RequestBody,
         @Part image: MultipartBody.Part?
-    ): Response<Unit>
+    ): Response<PlaceResponse>
 
     @FormUrlEncoded
     @PUT("api.php")
-    suspend fun updatePlace(
+    suspend fun updatePlaceForm(
         @Field("id") id: Int,
         @Field("title") title: String,
         @Field("lat") lat: Double,
@@ -48,7 +56,7 @@ interface PlacesApi {
 object ApiClient {
     val api: PlacesApi by lazy {
         Retrofit.Builder()
-            .baseUrl("http://192.168.1.105:5000/")
+            .baseUrl("https://labs.anontech.info/cse489/t3/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(PlacesApi::class.java)
