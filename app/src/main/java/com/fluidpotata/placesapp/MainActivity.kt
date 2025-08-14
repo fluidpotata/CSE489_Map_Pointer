@@ -89,6 +89,18 @@ fun MyApp() {
                 composable(ScreenRoutes.List) {
                     ListScreen(navController)
                 }
+
+                composable(
+                    "imageViewer/{imageUrl}",
+                    arguments = listOf(navArgument("imageUrl") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val decodedImagePath = java.net.URLDecoder.decode(
+                        backStackEntry.arguments?.getString("imageUrl") ?: "",
+                        "UTF-8"
+                    )
+                    ImageViewerScreen(decodedImagePath)
+                }
+
             }
         }
     }
@@ -96,7 +108,7 @@ fun MyApp() {
 
 @Composable
 fun DrawerContent(onItemClicked: (String) -> Unit) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
         Text("Navigation", style = MaterialTheme.typography.titleLarge)
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         DrawerItem("Home", onClick = { onItemClicked(ScreenRoutes.Map) })
@@ -111,3 +123,5 @@ fun DrawerItem(label: String, onClick: () -> Unit) {
         Text(text = label)
     }
 }
+
+
