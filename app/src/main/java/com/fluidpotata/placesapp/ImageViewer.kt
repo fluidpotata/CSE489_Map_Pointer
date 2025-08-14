@@ -1,24 +1,30 @@
 package com.fluidpotata.placesapp
 
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 
 @Composable
-fun ImageViewerScreen(imageUrl: String) {
-    SimpleImageViewer(url = "https://labs.anontech.info/cse489/t3/$imageUrl")
+fun ImageViewerScreen(imageUrl: String, title: String) {
+    SimpleImageViewer(
+        url = "https://labs.anontech.info/cse489/t3/$imageUrl",
+        title = title
+    )
 }
 
 @Composable
-fun SimpleImageViewer(url: String) {
+fun SimpleImageViewer(url: String, title: String) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
 
@@ -30,10 +36,11 @@ fun SimpleImageViewer(url: String) {
                     scale = (scale * zoom).coerceIn(0.5f, 5f)
                     offset += pan
                 }
-            },
-        contentAlignment = Alignment.Center
+            }
     ) {
-        NetworkImage(url = url,
+
+        NetworkImage(
+            url = url,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer(
@@ -43,5 +50,20 @@ fun SimpleImageViewer(url: String) {
                     translationY = offset.y
                 )
         )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .align(Alignment.TopCenter),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = title,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
     }
 }

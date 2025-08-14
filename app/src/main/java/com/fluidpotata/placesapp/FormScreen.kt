@@ -29,16 +29,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import java.io.File
-import java.io.FileOutputStream
-import kotlin.coroutines.resume
 import com.fluidpotata.placesapp.toPlainRequestBody
-
+import kotlin.coroutines.resume
 
 @Composable
 fun FormScreen(navController: NavController, placeId: Int? = null) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val db = remember { AppDatabase.getDatabase(context) }
 
     var title by remember { mutableStateOf("") }
@@ -47,7 +44,7 @@ fun FormScreen(navController: NavController, placeId: Int? = null) {
     var existingImageUrl by remember { mutableStateOf<String?>(null) }
     var selectedImage by remember { mutableStateOf<Bitmap?>(null) }
     var isLoading by remember { mutableStateOf(false) }
-    var errorMsg by remember { mutableStateOf<String?>(null) }
+    var serverMsg by remember { mutableStateOf<String?>(null) }
     var showCamera by remember { mutableStateOf(false) }
 
     val locationClient = remember {
@@ -82,18 +79,17 @@ fun FormScreen(navController: NavController, placeId: Int? = null) {
                         lat = it.latitude.toString()
                         lon = it.longitude.toString()
                     } ?: run {
-                        errorMsg = "Unable to fetch location"
+                        serverMsg = "Unable to fetch location"
                     }
                 } catch (e: Exception) {
-                    errorMsg = "Error fetching location: ${e.localizedMessage}"
+                    serverMsg = "Error fetching location: ${e.localizedMessage}"
                 }
             }
         } else {
-            errorMsg = "Location permission denied"
+            serverMsg = "Location permission denied"
         }
     }
 
-    // Load existing place data if editing
     LaunchedEffect(placeId) {
         placeId?.let {
             try {
@@ -102,14 +98,14 @@ fun FormScreen(navController: NavController, placeId: Int? = null) {
                 val place = places.find { p -> p.id == it }
                 place?.let {
                     title = it.title
-                    lat = it.lat.toString()
-                    lon = it.lon.toString()
+                    lat = it.lat ?: ""
+                    lon = it.lon ?: ""
                     existingImageUrl = it.image?.let { imgPath ->
                         "https://labs.anontech.info/cse489/t3/$imgPath"
                     }
                 }
             } catch (e: Exception) {
-                errorMsg = "Failed to load place data: ${e.localizedMessage}"
+                serverMsg = "Failed to load place data: ${e.localizedMessage}"
             } finally {
                 isLoading = false
             }
@@ -124,7 +120,7 @@ fun FormScreen(navController: NavController, placeId: Int? = null) {
                 showCamera = false
             },
             onError = { error ->
-                errorMsg = "Camera error: ${error.localizedMessage}"
+                serverMsg = "Camera error: ${error.localizedMessage}"
                 showCamera = false
             },
             onCancel = { showCamera = false }
@@ -195,52 +191,45 @@ fun FormScreen(navController: NavController, placeId: Int? = null) {
                 }
             }
 
-            if (errorMsg != null) {
-                Text(text = errorMsg!!, color = MaterialTheme.colorScheme.error)
-            }
-
             Button(
                 onClick = {
                     if (title.isBlank() || lat.isBlank() || lon.isBlank()) {
-                        errorMsg = "Please fill all fields"
+                        serverMsg = "Please fill all fields"
                         return@Button
                     }
 
                     val latDouble = lat.toDoubleOrNull()
                     val lonDouble = lon.toDoubleOrNull()
                     if (latDouble == null || lonDouble == null) {
-                        errorMsg = "Latitude and Longitude must be valid numbers"
+                        serverMsg = "Latitude and Longitude must be valid numbers"
                         return@Button
                     }
 
-                    errorMsg = null
                     isLoading = true
-
                     coroutineScope.launch {
                         try {
                             if (placeId == null) {
-                                // CREATE NEW PLACE (POST)
                                 val response = ApiClient.api.createPlace(
                                     title.toPlainRequestBody(),
                                     latDouble.toString().toPlainRequestBody(),
                                     lonDouble.toString().toPlainRequestBody(),
                                     selectedImage?.let { bitmapToMultipart(context, it, "image", "$title.jpg") }
                                 )
-                                if (response.isSuccessful) {
+                                val bodyStr = response.errorBody()?.string() ?: response.body()?.toString() ?: ""
+                                serverMsg = if (response.isSuccessful) {
                                     val newId = response.body()?.id
-                                    if (newId != null) {
-                                        db.placeOwnerDao().insertPlace(PlaceOwner(newId))
-                                    }
+                                    if (newId != null) db.placeOwnerDao().insertPlace(PlaceOwner(newId))
+                                    "Created successfully.\n$bodyStr"
+                                } else {
+                                    "Failed: ${response.code()} ${response.message()}\n$bodyStr"
+                                }
+                                if (response.isSuccessful) {
                                     navController.navigate(ScreenRoutes.List) {
                                         popUpTo(ScreenRoutes.List) { inclusive = true }
                                     }
-                                } else {
-                                    errorMsg = "Failed to save place: ${response.code()} ${response.message()}"
                                 }
                             } else {
-                                // UPDATE EXISTING PLACE (PUT)
                                 val response = if (selectedImage != null) {
-                                    // Multipart with image
                                     val imagePart = bitmapToMultipart(context, selectedImage!!, "image", "place_$placeId.jpg")
                                     ApiClient.api.updatePlaceWithImage(
                                         id = placeId,
@@ -250,7 +239,6 @@ fun FormScreen(navController: NavController, placeId: Int? = null) {
                                         image = imagePart
                                     )
                                 } else {
-
                                     ApiClient.api.updatePlaceForm(
                                         id = placeId,
                                         title = title,
@@ -258,17 +246,20 @@ fun FormScreen(navController: NavController, placeId: Int? = null) {
                                         lon = lonDouble
                                     )
                                 }
-
+                                val bodyStr = response.errorBody()?.string() ?: ""
+                                serverMsg = if (response.isSuccessful) {
+                                    "Updated successfully.\n$bodyStr"
+                                } else {
+                                    "Failed: ${response.code()} ${response.message()}\n$bodyStr"
+                                }
                                 if (response.isSuccessful) {
                                     navController.navigate(ScreenRoutes.List) {
                                         popUpTo(ScreenRoutes.List) { inclusive = true }
                                     }
-                                } else {
-                                    errorMsg = "Failed to update place: ${response.code()} ${response.message()}"
                                 }
                             }
                         } catch (e: Exception) {
-                            errorMsg = "Error saving place: ${e.localizedMessage}"
+                            serverMsg = "Error saving place: ${e.localizedMessage}"
                         } finally {
                             isLoading = false
                         }
@@ -279,9 +270,18 @@ fun FormScreen(navController: NavController, placeId: Int? = null) {
             ) {
                 Text(if (isLoading) "Saving..." else "Save Place")
             }
-
-
         }
+    }
+
+    if (serverMsg != null) {
+        AlertDialog(
+            onDismissRequest = { serverMsg = null },
+            confirmButton = {
+                TextButton(onClick = { serverMsg = null }) { Text("OK") }
+            },
+            title = { Text("Server Response") },
+            text = { Text(serverMsg ?: "") }
+        )
     }
 }
 

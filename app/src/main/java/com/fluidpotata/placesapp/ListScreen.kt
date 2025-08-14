@@ -1,7 +1,6 @@
 package com.fluidpotata.placesapp
 
 import android.Manifest
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -29,7 +28,6 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import okhttp3.MultipartBody
 
 @Composable
 fun ListScreen(navController: NavController) {
@@ -51,6 +49,7 @@ fun ListScreen(navController: NavController) {
     var showCamera by remember { mutableStateOf(false) }
     var isUpdating by remember { mutableStateOf(false) }
     var modalError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     val locationClient = LocationServices.getFusedLocationProviderClient(context)
 
@@ -127,44 +126,47 @@ fun ListScreen(navController: NavController) {
         } else {
             LazyColumn(contentPadding = PaddingValues(8.dp)) {
                 items(places) { place ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Row(
-                            Modifier
+                    if (!place.title.isNullOrBlank() && !place.lat.isNullOrBlank() && place.lat != "0.0"
+                        && !place.lon.isNullOrBlank() && place.lon != "0.0") {
+                        Card(
+                            modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            if (!place.image.isNullOrBlank()) {
-                                NetworkImage(
-                                    url = "https://labs.anontech.info/cse489/t3/${place.image}",
-                                    modifier = Modifier
-                                        .size(64.dp)
-                                        .background(Color.LightGray, RoundedCornerShape(4.dp))
-                                )
-                            }
-                            Spacer(Modifier.width(8.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(place.title, style = MaterialTheme.typography.bodyLarge)
-                                Text("Lat: ${place.lat}, Lon: ${place.lon}")
-                            }
-                            Spacer(Modifier.width(8.dp))
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (!place.image.isNullOrBlank()) {
+                                    NetworkImage(
+                                        url = "https://labs.anontech.info/cse489/t3/${place.image}",
+                                        modifier = Modifier
+                                            .size(64.dp)
+                                            .background(Color.LightGray, RoundedCornerShape(4.dp))
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(place.title, style = MaterialTheme.typography.bodyLarge)
+                                    Text("Lat: ${place.lat}, Lon: ${place.lon}")
+                                }
+                                Spacer(Modifier.width(8.dp))
 
-                            if (ownedIds.contains(place.id)) {
-                                TextButton(onClick = {
-                                    editingPlace = place
-                                    editTitle = place.title
-                                    editLat = place.lat ?: ""
-                                    editLon = place.lon ?: ""
-                                    selectedImage = null
-                                    modalError = null
-                                }) {
-                                    Text("Edit")
+                                if (ownedIds.contains(place.id)) {
+                                    TextButton(onClick = {
+                                        editingPlace = place
+                                        editTitle = place.title
+                                        editLat = place.lat ?: ""
+                                        editLon = place.lon ?: ""
+                                        selectedImage = null
+                                        modalError = null
+                                    }) {
+                                        Text("Edit")
+                                    }
                                 }
                             }
                         }
@@ -174,7 +176,20 @@ fun ListScreen(navController: NavController) {
         }
     }
 
-    // Edit modal
+    // Popup for server responses or errors
+    if (modalError != null) {
+        AlertDialog(
+            onDismissRequest = { modalError = null },
+            title = { Text("Server Response") },
+            text = { Text(modalError ?: "") },
+            confirmButton = {
+                TextButton(onClick = { modalError = null }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
     editingPlace?.let { place ->
         if (showCamera) {
             CameraCaptureScreen(
@@ -246,8 +261,6 @@ fun ListScreen(navController: NavController) {
                                     .height(150.dp)
                             )
                         }
-
-                        modalError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     }
                 },
                 confirmButton = {
@@ -262,17 +275,16 @@ fun ListScreen(navController: NavController) {
                         modalError = null
                         isUpdating = true
 
-                        coroutineScope.launch {
+                        scope.launch {
                             try {
-                                val response: retrofit2.Response<*>
-                                if (selectedImage != null) {
+                                val response = if (selectedImage != null) {
                                     val imagePart = bitmapToMultipart(
                                         context,
                                         selectedImage!!,
                                         "image",
                                         "place_${place.id}.jpg"
                                     )
-                                    response = ApiClient.api.updatePlaceWithImage(
+                                    ApiClient.api.updatePlaceWithImage(
                                         id = place.id,
                                         title = editTitle,
                                         lat = latDouble,
@@ -280,7 +292,7 @@ fun ListScreen(navController: NavController) {
                                         image = imagePart
                                     )
                                 } else {
-                                    response = ApiClient.api.updatePlaceForm(
+                                    ApiClient.api.updatePlaceForm(
                                         id = place.id,
                                         title = editTitle,
                                         lat = latDouble,
@@ -305,7 +317,40 @@ fun ListScreen(navController: NavController) {
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { editingPlace = null }) { Text("Cancel") }
+                    Row {
+                        TextButton(onClick = { editingPlace = null }) { Text("Cancel") }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        TextButton(onClick = {
+                            scope.launch {
+                                try {
+                                    val response = ApiClient.api.updatePlaceForm(
+                                        id = place.id,
+                                        title = "",
+                                        lat = 0.0,
+                                        lon = 0.0
+                                    )
+                                    val serverMsg = try {
+                                        val err = response.errorBody()?.string()
+                                        val msg = response.message()
+                                        if (response.isSuccessful) {
+                                            "Success: $msg\n${err ?: ""}"
+                                        } else {
+                                            "Failed: ${response.code()} $msg\n${err ?: ""}"
+                                        }
+                                    } catch (e: Exception) {
+                                        "⚠ Could not read server message: ${e.localizedMessage}"
+                                    }
+                                    modalError = serverMsg
+                                    loadPlaces()
+                                    editingPlace = null
+                                } catch (e: Exception) {
+                                    modalError = "Soft delete failed: ${e.localizedMessage}"
+                                }
+                            }
+                        }) {
+                            Text("Delete", color = Color.Red)
+                        }
+                    }
                 }
             )
         }

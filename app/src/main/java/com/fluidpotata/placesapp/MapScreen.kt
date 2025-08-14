@@ -57,22 +57,24 @@ fun MapScreen(navController: NavController) {
             onMapClick = { selectedPlace = null }
         ) {
             places.forEach { place ->
-                val lat = place.latAsDouble()
-                val lon = place.lonAsDouble()
-                if (lat != null && lon != null) {
-                    Marker(
-                        state = MarkerState(LatLng(lat, lon)),
-                        title = place.title,
-                        onClick = {
-                            selectedPlace = place
-                            true // consume click to show preview
-                        }
-                    )
+                if (!place.title.isNullOrBlank() && !place.lat.isNullOrBlank() && place.lat != "0.0"
+                    && !place.lon.isNullOrBlank() && place.lon != "0.0") {
+                    val lat = place.latAsDouble()
+                    val lon = place.lonAsDouble()
+                    if (lat != null && lon != null) {
+                        Marker(
+                            state = MarkerState(LatLng(lat, lon)),
+                            title = place.title,
+                            onClick = {
+                                selectedPlace = place
+                                true
+                            }
+                        )
+                    }
                 }
             }
         }
 
-        // Overlay for selected place (preview)
         selectedPlace?.let { place ->
             Box(
                 modifier = Modifier
@@ -89,11 +91,16 @@ fun MapScreen(navController: NavController) {
                             .clip(RoundedCornerShape(8.dp))
                             .clickable {
                                 val encodedPath = java.net.URLEncoder.encode(place.image ?: "", "UTF-8")
-                                navController.navigate("imageViewer/$encodedPath")
+                                val encodedTitle = java.net.URLEncoder.encode(place.title ?: "", "UTF-8")
+                                navController.navigate("imageViewer/$encodedPath/$encodedTitle")
                             }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(place.title, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        place.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.Black
+                    )
                 }
             }
         }

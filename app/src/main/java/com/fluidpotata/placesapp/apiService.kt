@@ -13,6 +13,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import java.io.File
 import java.io.FileOutputStream
+import androidx.core.graphics.scale
 
 data class Place(
     val id: Int,
@@ -83,7 +84,7 @@ fun bitmapToMultipart(
     partName: String,
     filename: String
 ): MultipartBody.Part {
-    val resized = Bitmap.createScaledBitmap(bitmap, 800, 600, true)
+    val resized = bitmap.scale(800, 600)
     val file = File(context.cacheDir, filename)
     FileOutputStream(file).use {
         resized.compress(Bitmap.CompressFormat.JPEG, 85, it)
